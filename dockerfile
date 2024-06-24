@@ -1,50 +1,39 @@
 # Etapa base
-FROM --platform=linux/amd64 node:21-alpine AS base
+FROM node:14-alpine AS base
 
 # Etapa de dependencias
-FROM base AS deps
+FROM base AS dependencies
 
 WORKDIR /app
 
-COPY package.json package-lock.json* yarn.lock* ./
+# Copiar archivos de configuración de dependencias
+COPY package.json package-lock.json* ./
 
-# Instalación de dependencias
-RUN if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then \
-      npm ci; \
-    else \
-      echo "Archivo de bloqueo no encontrado" && exit 1; \
-    fi
+# Instalación de todas las dependencias (incluidas las de desarrollo)
+RUN npm install
 
 # Etapa de construcción
-FROM base AS builder
+FROM dependencies AS build
 
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+# Copiar el resto de los archivos del proyecto
 COPY . .
 
-# Compilación del código
+# Compilación del código de Nest.js
 RUN npm run build
 
 # Etapa final
-FROM base AS runner
+FROM node:14-alpine
 
 WORKDIR /app
 
+# Copiar los archivos compilados y las dependencias del proyecto
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+
+# Configurar variables de entorno y puerto
 ENV NODE_ENV=production
-
-# Creación de usuario y grupo para seguridad
-RUN addgroup --system --gid 1001 aws-test \
-    && adduser --system --uid 101 usuario
-
-# Copia de los archivos necesarios desde la etapa de construcción
-COPY --from=builder --chown=usuario:aws-test /app/node_modules ./node_modules
-COPY --from=builder --chown=usuario:aws-test /app/dist ./dist
-
-USER usuario
-
 EXPOSE 3000
 
 # Comando para ejecutar la aplicación
