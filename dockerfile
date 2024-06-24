@@ -1,5 +1,5 @@
 # Etapa base
-FROM node:14-alpine AS base
+FROM node:16-alpine AS base
 
 # Etapa de dependencias
 FROM base AS dependencies
